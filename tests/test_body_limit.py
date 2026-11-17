@@ -4,7 +4,7 @@ from collections.abc import Iterable
 import pytest
 from starlette.types import Message, Receive, Scope, Send
 
-from app.core.body_limit import BodySizeLimitMiddleware, MAX_BODY_BYTES
+from app.core.body_limit import MAX_BODY_BYTES, BodySizeLimitMiddleware
 
 
 async def asgi_request(parts: Iterable[bytes]) -> list[Message]:
