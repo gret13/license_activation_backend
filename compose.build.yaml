@@ -1,0 +1,7 @@
+services:
+  api:
+    image: license-activation-backend:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: build

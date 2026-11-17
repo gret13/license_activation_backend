@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  redis:
+    image: redis:7-alpine
+    restart: "no"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [private]
+
+  api:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE in .env}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      LOG_HMAC_SECRET: ${LOG_HMAC_SECRET:?Set LOG_HMAC_SECRET}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-10}
+      DB_POOL_PRE_PING: ${DB_POOL_PRE_PING:-true}
+      REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-1}
+      REDIS_SOCKET_TIMEOUT: ${REDIS_SOCKET_TIMEOUT:-1}
+      APP_ENV: ${APP_ENV:-production}
+    ports:
+      - "${API_BIND_IP:-127.0.0.1}:${API_PORT:-55000}:55000"
+    volumes:
+      - ./logs:/app/logs
+      - ./secrets:/app/secrets
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:55000/health/live', timeout=2)"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+      start_period: 15s
+    networks: [private]
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  postgres_data:
